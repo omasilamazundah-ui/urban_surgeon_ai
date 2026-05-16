@@ -1,0 +1,6 @@
+osmnx
+networkx
+pandas
+geopy
+requests
+streamlit
