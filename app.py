@@ -1,188 +1,114 @@
 import streamlit as st
-import osmnx as ox
-import networkx as nx
 import pandas as pd
 import plotly.express as px
 import os
-from datetime import datetime
 
-from geopy.geocoders import Nominatim
-geolocator = Nominatim(user_agent="urban_surgeon_ai")
-# =====================================
+# ============================================
 # PAGE CONFIG
-# =====================================
+# ============================================
+
 st.set_page_config(
     page_title="Urban Surgeon AI",
     layout="wide"
 )
 
-st.title("🏙️ Urban Surgeon AI")
-st.write("Interactive Traffic Hotspot Mapping System")
+# ============================================
+# TITLE
+# ============================================
 
-# =====================================
-# ZONES
-# =====================================
-zones = {
-    "Port Harcourt": "Port Harcourt, Rivers State, Nigeria",
-    "Obio/Akpor": "Obio-Akpor, Rivers State, Nigeria"
-}
+st.title("🚦 Urban Surgeon AI")
+st.subheader("Port Harcourt Traffic Intelligence Dashboard")
 
-# =====================================
-# SELECT ZONE
-# =====================================
-selected_zone = st.selectbox(
-    "Select Zone",
-    list(zones.keys())
-)
+# ============================================
+# LOAD HOTSPOT DATA
+# ============================================
 
-# =====================================
-# CACHE GRAPH
-# =====================================
-@st.cache_resource
-def load_graph(place):
-    return ox.graph_from_place(
-        place,
-        network_type="drive"
-    )
+if os.path.exists("traffic_hotspots.csv"):
 
-# =====================================
-# RUN ANALYSIS
-# =====================================
-if st.button("RUN HOTSPOT MAP"):
+    df = pd.read_csv("traffic_hotspots.csv")
 
-    try:
+    # ========================================
+    # METRICS
+    # ========================================
 
-        place = zones[selected_zone]
+    col1, col2, col3 = st.columns(3)
 
-        st.write(f"Loading {selected_zone} road network...")
-
-        # ---------------------------------
-        # LOAD GRAPH
-        # ---------------------------------
-        G = load_graph(place)
-
-        st.success("Road network loaded")
-
-        # ---------------------------------
-        # SIMPLE GRAPH
-        # ---------------------------------
-        G_simple = nx.Graph(G)
-
-        st.write("Calculating hotspot importance...")
-
-        # ---------------------------------
-        # CENTRALITY
-        # ---------------------------------
-        centrality = nx.betweenness_centrality(
-            G_simple,
-            k=20,
-            seed=42
+    with col1:
+        st.metric(
+            "Total Records",
+            len(df)
         )
 
-        # ---------------------------------
-        # TOP HOTSPOTS
-        # ---------------------------------
-        top_nodes = sorted(
-            centrality,
-            key=centrality.get,
-            reverse=True
-        )[:30]
+    with col2:
+        st.metric(
+            "Unique Locations",
+            df["location"].nunique()
+        )
 
-        # ---------------------------------
-        # BUILD DATAFRAME
-        # ---------------------------------
-        hotspot_data = []
-        
-        for node in top_nodes:
+    with col3:
 
-            lat = G.nodes[node]["y"]
-            lon = G.nodes[node]["x"]
+        if "congestion" in df.columns:
 
-            try:
-                location = geolocator.reverse((lat, lon), timeout=10)
-
-                if location:
-
-                address = location.raw.get("address", {})
-
-                place_name = (
-                    address.get("road")
-                    or address.get("suburb")
-                    or address.get("neighbourhood")
-                    or address.get("city")
-                    or "Unknown Area"
-                )
-
-            else:
-                place_name = "Unknown Area"
-
-            except:
-                place_name = "Unknown Area"
-
-            hotspot_data.append({
-                "node": node,
-                "lat": lat,
-                "lon": lon,
-                "score": centrality[node],
-                "location": place_name
-            })
-            df = pd.DataFrame(hotspot_data)
-            df["timestamp"] = datetime.now()
-
-            df["zone"] = selected_zone
-
-            file_name = "traffic_hotspots.csv"
-
-            if os.path.exists(file_name):
-
-                df.to_csv(
-                    file_name,
-                    mode="a",
-                    header=False,
-                    index=False
-                )
-
-        else:
-
-            df.to_csv(
-                file_name,
-                index=False
+            avg_congestion = round(
+                df["congestion"].mean(),
+                2
             )
 
-        st.success("Hotspot data saved successfully")
-        # ---------------------------------
-        # MAP
-        # ---------------------------------
-        fig = px.scatter_mapbox(
-            df,
-            lat="lat",
-            lon="lon",
-            size="score",
-            color="score",
-            hover_data=["node", "score"],
-            zoom=11,
-            height=700
+            st.metric(
+                "Average Congestion",
+                f"{avg_congestion}%"
+            )
+
+    # ========================================
+    # TABLE
+    # ========================================
+
+    st.subheader("📊 Traffic Hotspot Data")
+
+    st.dataframe(df)
+    st.write(df["zone"].unique())
+    # ============================================
+# MAP VISUALIZATION
+# ============================================
+
+st.subheader("🗺️ Traffic Hotspot Map")
+
+fig = px.scatter_mapbox(
+    df,
+    lat="lat",
+    lon="lon",
+    hover_name="location",
+    hover_data=["zone", "score"],
+    color="score",
+    size="score",
+    zoom=11,
+    height=600
+)
+
+fig.update_layout(
+    mapbox_style="open-street-map",
+    margin={"r":0,"t":0,"l":0,"b":0}
+)
+
+st.plotly_chart(fig, use_container_width=True)
+    
+
+    # ========================================
+    # CONGESTION CHART
+    # ========================================
+
+if "congestion" in df.columns:
+
+        chart = px.bar(
+            df.tail(20),
+            x="location",
+            y="congestion",
+            color="zone",
+            title="Traffic Congestion Levels"
         )
 
-        fig.update_layout(
-            mapbox_style="open-street-map",
-            margin={"r":0,"t":0,"l":0,"b":0}
-        )
-
-        # ---------------------------------
-        # DISPLAY MAP
-        # ---------------------------------
         st.plotly_chart(
-            fig,
+            chart,
             use_container_width=True
         )
 
-        # ---------------------------------
-        # HOTSPOT TABLE
-        # ---------------------------------
-        st.subheader("🔥 Top Traffic Hotspots")
-
-        st.dataframe(df)
-
-    except Exception as e:
-        st.error(f"System Error: {e}")
