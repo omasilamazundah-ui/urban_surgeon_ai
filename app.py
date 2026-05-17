@@ -3,112 +3,176 @@ import pandas as pd
 import plotly.express as px
 import os
 
-# ============================================
-# PAGE CONFIG
-# ============================================
+# ==================================================
+# PAGE CONFIGURATION
+# ==================================================
 
 st.set_page_config(
-    page_title="Urban Surgeon AI",
+    page_title="InfraFlow",
     layout="wide"
 )
 
-# ============================================
+# ==================================================
 # TITLE
-# ============================================
+# ==================================================
 
-st.title("🚦 Urban Surgeon AI")
-st.subheader("Port Harcourt Traffic Intelligence Dashboard")
+st.title("🏗 InfraFlow")
 
-# ============================================
-# LOAD HOTSPOT DATA
-# ============================================
+st.subheader(
+    "Smart Mobility & Infrastructure Intelligence"
+)
+
+# ==================================================
+# LOAD TRAFFIC DATA
+# ==================================================
 
 if os.path.exists("traffic_hotspots.csv"):
 
-    df = pd.read_csv("traffic_hotspots.csv")
+    try:
 
-    # ========================================
-    # METRICS
-    # ========================================
+        df = pd.read_csv("traffic_hotspots.csv")
 
-    col1, col2, col3 = st.columns(3)
+        # ==========================================
+        # SYSTEM METRICS
+        # ==========================================
 
-    with col1:
-        st.metric(
-            "Total Records",
-            len(df)
-        )
+        st.subheader("📈 System Metrics")
 
-    with col2:
-        st.metric(
-            "Unique Locations",
-            df["location"].nunique()
-        )
+        col1, col2, col3 = st.columns(3)
 
-    with col3:
-
-        if "congestion" in df.columns:
-
-            avg_congestion = round(
-                df["congestion"].mean(),
-                2
-            )
+        with col1:
 
             st.metric(
-                "Average Congestion",
-                f"{avg_congestion}%"
+                "Total Records",
+                len(df)
             )
 
-    # ========================================
-    # TABLE
-    # ========================================
+        with col2:
 
-    st.subheader("📊 Traffic Hotspot Data")
+            if "zone" in df.columns:
 
-    st.dataframe(df)
-    st.write(df["zone"].unique())
-    # ============================================
-# MAP VISUALIZATION
-# ============================================
+                st.metric(
+                    "Zones Monitored",
+                    df["zone"].nunique()
+                )
 
-st.subheader("🗺️ Traffic Hotspot Map")
+        with col3:
 
-fig = px.scatter_mapbox(
-    df,
-    lat="lat",
-    lon="lon",
-    hover_name="location",
-    hover_data=["zone", "score"],
-    color="score",
-    size="score",
-    zoom=11,
-    height=600
-)
+            if "timestamp" in df.columns:
 
-fig.update_layout(
-    mapbox_style="open-street-map",
-    margin={"r":0,"t":0,"l":0,"b":0}
-)
+                st.metric(
+                    "Latest Update",
+                    str(df["timestamp"].iloc[-1])
+                )
 
-st.plotly_chart(fig, use_container_width=True)
-    
+        # ==========================================
+        # LIVE HOTSPOT TABLE
+        # ==========================================
 
-    # ========================================
-    # CONGESTION CHART
-    # ========================================
+        st.subheader("📊 Live Traffic Hotspots")
 
-if "congestion" in df.columns:
+        st.dataframe(df)
 
-        chart = px.bar(
-            df.tail(20),
-            x="location",
-            y="congestion",
+        # ==========================================
+        # LIVE HOTSPOT MAP
+        # ==========================================
+
+        st.subheader("🗺 Live Hotspot Map")
+
+        fig = px.scatter_mapbox(
+            df,
+            lat="lat",
+            lon="lon",
+            hover_name="location",
+            hover_data=["zone", "score"],
             color="zone",
-            title="Traffic Congestion Levels"
+            size="score",
+            zoom=10,
+            height=650
+        )
+
+        fig.update_layout(
+            mapbox_style="open-street-map",
+            margin={"r":0, "t":0, "l":0, "b":0}
         )
 
         st.plotly_chart(
-            chart,
+            fig,
             use_container_width=True
         )
 
+        # ==========================================
+        # CONGESTION ANALYSIS
+        # ==========================================
+
+        if "congestion" in df.columns:
+
+            st.subheader("🚦 Congestion Analysis")
+
+            congestion_chart = px.bar(
+                df,
+                x="location",
+                y="congestion",
+                color="zone",
+                title="Traffic Congestion Levels"
+            )
+
+            st.plotly_chart(
+                congestion_chart,
+                use_container_width=True
+            )
+
+        # ==========================================
+        # FUTURE GRAPH INTELLIGENCE
+        # ==========================================
+
+        st.subheader(
+            "🧠 Directed Weighted Graph Intelligence"
+        )
+
+        st.info(
+            "Future congestion-aware graph analysis "
+            "and weighted routing intelligence "
+            "will appear here after sufficient "
+            "data accumulation."
+        )
+
+        # ==========================================
+        # FUTURE ROUTE OPTIMIZATION
+        # ==========================================
+
+        st.subheader(
+            "🚗 Route Optimization Engine"
+        )
+
+        st.info(
+            "Future shortest-path routing, "
+            "rerouting intelligence, and "
+            "dynamic traffic optimization "
+            "will appear here."
+        )
+
+        # ==========================================
+        # FUTURE INFRASTRUCTURE RECOMMENDATIONS
+        # ==========================================
+
+        st.subheader(
+            "🏗 Infrastructure Recommendation Engine"
+        )
+
+        st.info(
+            "Future infrastructure recommendations "
+            "based on persistent congestion "
+            "patterns and weighted graph analysis "
+            "will appear here."
+        )
+
+    except Exception as e:
+
+        st.error(f"System Error: {e}")
+
+else:
+
+    st.warning(
+        "traffic_hotspots.csv not found."
+    )
