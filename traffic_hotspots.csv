@@ -1,12 +1,5 @@
-zone,location,lat,lon,score,timestamp
-
-Port Harcourt,Ogbunabali Street,4.8056683,7.0097395,0.3345,2026-05-16 14:30:15
-
-Port Harcourt,Garrison Road,4.8095941,7.0164415,0.3216,2026-05-16 14:30:16
-
-Port Harcourt,Rumuokalagbor,4.8088598,7.013026,0.3173,2026-05-16 14:30:17
-
-Obio/Akpor,Old Aba Road,4.8363741,7.0212719,0.3106,2026-05-16 14:30:19Obio/Akpor,Port Harcourt - Aba Expressway,4.8364106,7.0155988,0.319630036425092,2026-05-17 08:40:06.849832,58,58,0.0
+zone,location,lat,lon,score,timestamp,speed,free_flow_speed,congestion_score
+Obio/Akpor,Port Harcourt - Aba Expressway,4.8364106,7.0155988,0.319630036425092,2026-05-17 08:40:06.849832,58,58,0.0
 Obio/Akpor,Port Harcourt - Aba Expressway,4.8363741,7.0212719,0.31063397576420454,2026-05-17 08:40:08.164875,58,58,0.0
 Obio/Akpor,Unknown Area,4.8461211,7.0439288,0.30819878351137436,2026-05-17 08:40:09.783399,58,58,0.0
 Obio/Akpor,Enugu - Port Harcourt Expressway,4.8425097,7.0354986,0.30666619333507505,2026-05-17 08:40:10.859249,58,58,0.0
