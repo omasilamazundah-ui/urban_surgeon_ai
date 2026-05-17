@@ -195,6 +195,6 @@ while True:
     # =====================================
     # WAIT 30 minutes
     # =====================================
-    print("\nWaiting 30 minutes before next scan...\n")
+    print("\nWaiting 15 minutes before next scan...\n")
 
-    time.sleep(1800)
+    time.sleep(900)
