@@ -9,6 +9,8 @@ from sqlalchemy import create_engine
 from datetime import datetime
 from geopy.geocoders import Nominatim
 
+TOMTOM_API_KEY = "GBCC2VIMIdsT3SSPzcnJiQO4QazAaI2Z"
+
 # DATABASE CONNECTION
 DATABASE_URL = os.getenv("DATABASE_URL")
 
@@ -41,24 +43,51 @@ while True:
             # LOAD GRAPH
             G = ox.graph_from_place(place, network_type="drive")
 
-            # BASIC ANALYSIS
-            num_nodes = len(G.nodes)
-            num_edges = len(G.edges)
+    
+            # GET CENTER COORDINATES
+center_node = list(G.nodes())[0]
 
-            congestion = round((num_edges / num_nodes) * 10, 2)
+lat = G.nodes[center_node]["y"]
+lon = G.nodes[center_node]["x"]
 
-            hotspot_data.append({
-                "zone": zone_name,
-                "location": street_name,
-                "latitute": lat,
-                "longitude": lon,
-                "timestamp": datetime.now(),
-                "current_speed": num_edges,
-                "free_flow_speed": num_nodes,
-                "traffic_score": score,
-                "congestion": congestion
-            })
+# TOMTOM TRAFFIC API
+url = (
+    f"https://api.tomtom.com/traffic/services/4/"
+    f"flowSegmentData/absolute/10/json"
+    f"?point={lat},{lon}"
+    f"&key={TOMTOM_API_KEY}"
+)
 
+response = requests.get(url)
+
+traffic = response.json()
+
+flow = traffic["flowSegmentData"]
+
+current_speed = flow["currentSpeed"]
+free_flow_speed = flow["freeFlowSpeed"]
+current_travel_time = flow["currentTravelTime"]
+free_flow_travel_time = flow["freeFlowTravelTime"]
+
+# CONGESTION %
+congestion = round(
+    (
+        (free_flow_speed - current_speed)
+        / free_flow_speed
+    ) * 100,
+    2
+)
+           hotspot_data.append({
+               "zone": zone_name,
+               "latitude": lat,
+               "longitude": lon,
+               "timestamp": datetime.now(),
+               "current_speed": current_speed,
+               "free_flow_speed": free_flow_speed,
+               "current_travel_time": current_travel_time,
+               "free_flow_travel_time": free_flow_travel_time,
+               "congestion": congestion
+     })
             # DATAFRAME
             df = pd.DataFrame(hotspot_data)
 
