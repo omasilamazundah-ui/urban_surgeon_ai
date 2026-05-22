@@ -163,19 +163,20 @@ while True:
             # ---------------------------------
             # DATAFRAME
             # ---------------------------------
-            df = pd.DataFrame(hotspot_data)
+        try:
+			df = pd.DataFrame(hotspot_data)
 
             # ---------------------------------
             # SAVE CSV
             # ---------------------------------
             df.to_sql(
-    "traffic_data",
-    engine,
-    if_exists="append",
-    index=False
-)
+                "traffic_data",
+                engine,
+                if_exists="append",
+                index=False
+            )
 
-print(f"{zone_name} saved successfully to PostgreSQL")
+            print(f"{zone_name} saved successfully to PostgreSQL")
 
 
         except Exception as e:
