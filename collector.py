@@ -168,25 +168,15 @@ while True:
             # ---------------------------------
             # SAVE CSV
             # ---------------------------------
-            file_name = "traffic_hotspots.csv"
+            df.to_sql(
+    "traffic_data",
+    engine,
+    if_exists="append",
+    index=False
+)
 
-            if os.path.exists(file_name):
+print(f"{zone_name} saved successfully to PostgreSQL")
 
-                df.to_csv(
-                    file_name,
-                    mode="a",
-                    header=False,
-                    index=False
-                )
-
-            else:
-
-                df.to_csv(
-                    file_name,
-                    index=False
-                )
-
-            print(f"{zone_name} saved successfully")
 
         except Exception as e:
 
