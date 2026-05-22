@@ -49,9 +49,13 @@ while True:
 
             hotspot_data.append({
                 "zone": zone_name,
+                "location": street_name,
+                "latitute": lat,
+                "longitude": lon,
                 "timestamp": datetime.now(),
                 "current_speed": num_edges,
                 "free_flow_speed": num_nodes,
+                "traffic_score": score,
                 "congestion": congestion
             })
 
