@@ -5,30 +5,30 @@ import os
 import time
 import requests
 
+from sqlalchemy import create_engine
 from datetime import datetime
 from geopy.geocoders import Nominatim
 
-# =====================================
+# DATABASE CONNECTION
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+engine = create_engine(DATABASE_URL)
+
 # GEOCODER
-# =====================================
 geolocator = Nominatim(user_agent="urban_surgeon_ai")
 
-# =====================================
 # ZONES
-# =====================================
 zones = {
     "Port Harcourt": "Port Harcourt, Rivers State, Nigeria",
     "Obio/Akpor": "Obio-Akpor, Rivers State, Nigeria"
 }
 
-# =====================================
 # MAIN LOOP
-# =====================================
 while True:
 
-    print("\n===================================")
+    print("\n==============================")
     print("RUNNING AUTOMATIC HOTSPOT SCAN...")
-    print("===================================\n")
+    print("==============================\n")
 
     for zone_name, place in zones.items():
 
@@ -36,139 +36,29 @@ while True:
 
             print(f"Loading {zone_name} road network...")
 
-            # ---------------------------------
-            # LOAD GRAPH
-            # ---------------------------------
-            G = ox.graph_from_place(
-                place,
-                network_type="drive"
-            )
-
-            # ---------------------------------
-            # SIMPLE GRAPH
-            # ---------------------------------
-            G_simple = nx.Graph(G)
-
-            # ---------------------------------
-            # CENTRALITY
-            # ---------------------------------
-            centrality = nx.betweenness_centrality(
-                G_simple,
-                k=20,
-                seed=42
-            )
-
-            # ---------------------------------
-            # TOP HOTSPOTS
-            # ---------------------------------
-            top_nodes = sorted(
-                centrality,
-                key=centrality.get,
-                reverse=True
-            )[:10]
-
             hotspot_data = []
 
-            # ---------------------------------
-            # BUILD DATA
-            # ---------------------------------
-            for node in top_nodes:
+            # LOAD GRAPH
+            G = ox.graph_from_place(place, network_type="drive")
 
-                lat = G.nodes[node]["y"]
-                lon = G.nodes[node]["x"]
+            # BASIC ANALYSIS
+            num_nodes = len(G.nodes)
+            num_edges = len(G.edges)
 
-                # ---------------------------------
-                # LIVE TRAFFIC DATA
-                # ---------------------------------
-                api_key = "GBCC2VIMIdsT3SSPzcnJiQO4QazAaI2Z"
+            congestion = round((num_edges / num_nodes) * 10, 2)
 
-                traffic_url = (
-                    f"https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json"
-                    f"?key={api_key}&point={lat},{lon}"
-                )
+            hotspot_data.append({
+                "zone": zone_name,
+                "timestamp": datetime.now(),
+                "current_speed": num_edges,
+                "free_flow_speed": num_nodes,
+                "congestion": congestion
+            })
 
-                traffic_response = requests.get(
-                    traffic_url,
-		    timeout=10
-                )
-
-                traffic_data = traffic_response.json()
-
-                try:
-
-                    current_speed = traffic_data["flowSegmentData"]["currentSpeed"]
-
-                    free_flow_speed = traffic_data["flowSegmentData"]["freeFlowSpeed"]
-
-                    congestion = round(
-                        100 - (current_speed / free_flow_speed * 100),
-                        2
-                    )
-
-                except:
-
-                    current_speed = None
-                    free_flow_speed = None
-                    congestion = None
-
-                # ---------------------------------
-                # LOCATION DATA
-                # ---------------------------------
-                try:
-
-                    location = geolocator.reverse(
-                        (lat, lon),
-                        timeout=10
-                    )
-
-                    if location:
-
-                        address = location.raw.get(
-                            "address",
-                            {}
-                        )
-
-                        place_name = (
-                            address.get("road")
-                            or address.get("suburb")
-                            or address.get("neighbourhood")
-                            or address.get("city")
-                            or "Unknown Area"
-                        )
-
-                    else:
-
-                        place_name = "Unknown Area"
-
-                except:
-
-                    place_name = "Unknown Area"
-
-                hotspot_data.append({
-
-                    "zone": zone_name,
-                    "location": place_name,
-                    "lat": lat,
-                    "lon": lon,
-                    "score": centrality[node],
-                    "timestamp": datetime.now(),
-
-                    "current_speed": current_speed,
-                    "free_flow_speed": free_flow_speed,
-                    "congestion": congestion
-
-                })
-		
-
-            # ---------------------------------
             # DATAFRAME
-            # ---------------------------------
-        try:
-			df = pd.DataFrame(hotspot_data)
+            df = pd.DataFrame(hotspot_data)
 
-            # ---------------------------------
-            # SAVE CSV
-            # ---------------------------------
+            # SAVE TO POSTGRESQL
             df.to_sql(
                 "traffic_data",
                 engine,
@@ -178,14 +68,11 @@ while True:
 
             print(f"{zone_name} saved successfully to PostgreSQL")
 
-
         except Exception as e:
 
             print(f"Error in {zone_name}: {e}")
 
-    # =====================================
-    # WAIT 30 minutes
-    # =====================================
+    # WAIT 15 MINUTES
     print("\nWaiting 15 minutes before next scan...\n")
 
     time.sleep(900)
