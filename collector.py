@@ -91,7 +91,7 @@ while True:
 
             # SAVE TO POSTGRESQL
             df.to_sql(
-                "traffic_data",
+                "traffic_data_v2",
                 engine,
                 if_exists="append",
                 index=False
