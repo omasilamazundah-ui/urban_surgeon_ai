@@ -7,31 +7,36 @@ import osmnx as ox
 from sqlalchemy import create_engine
 from datetime import datetime
 
-# =========================
+# =====================================
 # TOMTOM API KEY
-# =========================
+# =====================================
+
 TOMTOM_API_KEY = "GBCC2VIMIdsT3SSPzcnJiQO4QazAaI2Z"
 
-# =========================
+# =====================================
 # DATABASE CONNECTION
-# =========================
+# =====================================
+
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 engine = create_engine(DATABASE_URL)
 
-# =========================
+# =====================================
 # MAIN LOOP
-# =========================
+# =====================================
+
 while True:
 
-    print("\n==============================")
-    print("RUNNING AUTOMATIC HOTSPOT SCAN")
-    print("==============================\n")
+    print("\n===================================")
+    print("RUNNING LIVE TRAFFIC COLLECTION")
+    print("===================================\n")
 
     cities = [
         "Port Harcourt, Rivers State, Nigeria",
         "Obio-Akpor, Rivers State, Nigeria"
     ]
+
+    all_data = []
 
     for city in cities:
 
@@ -45,106 +50,140 @@ while True:
                 network_type="drive"
             )
 
-            hotspot_data = []
-
-            # CONVERT GRAPH TO ROAD DATA
+            # CONVERT GRAPH TO DATAFRAME
             edges = ox.graph_to_gdfs(
                 G,
                 nodes=False
             )
 
-            # SAMPLE 50 ROADS
+            # SAMPLE MANY ROADS
             sampled_edges = edges.head(50)
 
             for _, edge in sampled_edges.iterrows():
 
-                # GET ROAD NAME
-                street_name = edge.get(
-                    "name",
-                    "Unknown Road"
-                )
+                try:
 
-                # HANDLE MULTIPLE ROAD NAMES
-                if isinstance(street_name, list):
-                    street_name = street_name[0]
+                    # ROAD NAME
+                    street_name = edge.get(
+                        "name",
+                        "Unknown Road"
+                    )
 
-                # ROAD GEOMETRY
-                geometry = edge.geometry
+                    # HANDLE MULTIPLE NAMES
+                    if isinstance(street_name, list):
+                        street_name = street_name[0]
 
-                # GET CENTER POINT
-                center = geometry.centroid
+                    # GEOMETRY
+                    geometry = edge.geometry
 
-                lat = center.y
-                lon = center.x
+                    # CENTER COORDINATES
+                    center = geometry.centroid
 
-                # TOMTOM TRAFFIC REQUEST
-                url = (
-                    f"https://api.tomtom.com/traffic/services/4/"
-                    f"flowSegmentData/absolute/10/json"
-                    f"?point={lat},{lon}"
-                    f"&key={TOMTOM_API_KEY}"
-                )
+                    lat = center.y
+                    lon = center.x
 
-                response = requests.get(url)
+                    # TOMTOM API REQUEST
+                    url = (
+                        f"https://api.tomtom.com/traffic/services/4/"
+                        f"flowSegmentData/absolute/10/json"
+                        f"?point={lat},{lon}"
+                        f"&key={TOMTOM_API_KEY}"
+                    )
 
-                traffic = response.json()
+                    response = requests.get(url)
 
-                # SKIP INVALID RESPONSES
-                if "flowSegmentData" not in traffic:
-                    continue
+                    traffic = response.json()
 
-                flow = traffic["flowSegmentData"]
+                    # SKIP INVALID RESPONSES
+                    if "flowSegmentData" not in traffic:
+                        continue
 
-                current_speed = flow["currentSpeed"]
+                    flow = traffic["flowSegmentData"]
 
-                free_flow_speed = flow["freeFlowSpeed"]
+                    # SPEEDS
+                    current_speed = flow["currentSpeed"]
 
-                current_travel_time = flow["currentTravelTime"]
+                    free_flow_speed = flow["freeFlowSpeed"]
 
-                free_flow_travel_time = flow["freeFlowTravelTime"]
+                    # TRAVEL TIMES → MINUTES
+                    current_travel_time = round(
+                        flow["currentTravelTime"] / 60,
+                        2
+                    )
 
-                # CALCULATE CONGESTION %
-                congestion = round(
-                    (
-                        (free_flow_speed - current_speed)
-                        / free_flow_speed
-                    ) * 100,
-                    2
-                )
+                    free_flow_travel_time = round(
+                        flow["freeFlowTravelTime"] / 60,
+                        2
+                    )
 
-                # SAVE DATA
-                hotspot_data.append({
+                    # CONGESTION %
+                    congestion = round(
+                        (
+                            (free_flow_speed - current_speed)
+                            / free_flow_speed
+                        ) * 100,
+                        2
+                    )
 
-                    "zone": city,
-                    "location": street_name,
-                    "latitude": lat,
-                    "longitude": lon,
-                    "timestamp": datetime.now(),
-                    "current_speed": current_speed,
-                    "free_flow_speed": free_flow_speed,
-                    "current_travel_time": current_travel_time,
-                    "free_flow_travel_time": free_flow_travel_time,
-                    "congestion": congestion
+                    # SAVE ROW
+                    all_data.append({
 
-                })
+                        "zone": city,
 
-            # CREATE DATAFRAME
-            df = pd.DataFrame(hotspot_data)
+                        "location": street_name,
 
-            # SAVE TO POSTGRESQL
-            df.to_sql(
-                "traffic_data_v4",
-                engine,
-                if_exists="append",
-                index=False
-            )
+                        "latitude": round(lat, 6),
 
-            print(f"{city} saved successfully")
+                        "longitude": round(lon, 6),
 
-        except Exception as e:
+                        "timestamp": datetime.now(),
 
-            print(f"Error in {city}: {e}")
+                        "current_speed_kmh":
+                            f"{current_speed} km/h",
 
-    print("\nWaiting 15 minutes...\n")
+                        "free_flow_speed_kmh":
+                            f"{free_flow_speed} km/h",
+
+                        "current_travel_time_minutes":
+                            f"{current_travel_time} mins",
+
+                        "free_flow_travel_time_minutes":
+                            f"{free_flow_travel_time} mins",
+
+                        "congestion_percent":
+                            f"{congestion}%"
+
+                    })
+
+                except Exception as road_error:
+
+                    print(f"Road skipped: {road_error}")
+
+        except Exception as city_error:
+
+            print(f"Error in {city}: {city_error}")
+
+    # =====================================
+    # SAVE TO DATABASE
+    # =====================================
+
+    if len(all_data) > 0:
+
+        df = pd.DataFrame(all_data)
+
+        df.to_sql(
+            "traffic_data_final",
+            engine,
+            if_exists="append",
+            index=False
+        )
+
+        print(f"\nSaved {len(all_data)} traffic records\n")
+
+    else:
+
+        print("\nNo traffic data collected\n")
+
+    print("Waiting 15 minutes...\n")
 
     time.sleep(900)
