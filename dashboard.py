@@ -2,6 +2,8 @@ import os
 import pandas as pd
 import streamlit as st
 import plotly.express as px
+import folium
+from streamlit_folium import st_folium
 
 from sqlalchemy import create_engine
 
@@ -198,3 +200,89 @@ st.subheader(
 )
 
 st.dataframe(df)
+# =====================================
+# LIVE TRAFFIC MAP
+# =====================================
+
+st.subheader(
+    "Live Traffic Map"
+)
+
+# CENTER MAP
+traffic_map = folium.Map(
+
+    location=[4.8156, 7.0498],
+
+    zoom_start=12
+
+)
+
+# ADD TRAFFIC POINTS
+for _, row in df.iterrows():
+
+    try:
+
+        lat = float(row["latitude"])
+
+        lon = float(row["longitude"])
+
+        congestion = float(
+
+            str(
+                row["congestion_percent"]
+            ).replace("%", "")
+
+        )
+
+        location_name = row["location"]
+
+        # COLOR LOGIC
+        if congestion < 30:
+
+            color = "green"
+
+        elif congestion < 60:
+
+            color = "orange"
+
+        else:
+
+            color = "red"
+
+        folium.CircleMarker(
+
+            location=[lat, lon],
+
+            radius=6,
+
+            popup=(
+
+                f"{location_name}<br>"
+                f"Congestion: {congestion}%"
+
+            ),
+
+            color=color,
+
+            fill=True,
+
+            fill_color=color,
+
+            fill_opacity=0.7
+
+        ).add_to(traffic_map)
+
+    except:
+
+        continue
+
+# DISPLAY MAP
+st_folium(
+
+    traffic_map,
+
+    width=1200,
+
+    height=600
+
+)
