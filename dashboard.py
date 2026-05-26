@@ -1,3 +1,5 @@
+import osmnx as ox
+import networkx as nx
 import os
 import pandas as pd
 import streamlit as st
@@ -286,3 +288,148 @@ st_folium(
     height=600
 
 )
+
+# =====================================
+# LIVE ROUTE OPTIMIZATION
+# =====================================
+
+st.subheader(
+    "Smart Route Optimization"
+)
+
+# LOAD ROAD NETWORK
+G = ox.graph_from_place(
+
+    "Port Harcourt, Rivers State, Nigeria",
+
+    network_type="drive"
+
+)
+
+# APPLY TRAFFIC WEIGHTS
+for u, v, key, data in G.edges(
+    keys=True,
+    data=True
+):
+
+    road_name = data.get("name")
+
+    if road_name is None:
+        continue
+
+    if isinstance(road_name, list):
+        road_name = road_name[0]
+
+    matching_rows = df[
+        df["location"] == road_name
+    ]
+
+    if len(matching_rows) > 0:
+
+        congestion_value = matching_rows.iloc[0][
+            "congestion_value"
+        ]
+
+        data["weight"] = congestion_value
+
+    else:
+
+        data["weight"] = 10
+
+# LOCATION OPTIONS
+locations = sorted(
+    df["location"].dropna().unique()
+)
+
+# USER INPUTS
+start_location = st.selectbox(
+
+    "Select Start Location",
+
+    locations
+
+)
+
+destination_location = st.selectbox(
+
+    "Select Destination",
+
+    locations
+
+)
+
+# GET COORDINATES
+start_row = df[
+    df["location"] == start_location
+].iloc[0]
+
+end_row = df[
+    df["location"] == destination_location
+].iloc[0]
+
+# NEAREST GRAPH NODES
+start_node = ox.distance.nearest_nodes(
+
+    G,
+
+    X=float(start_row["longitude"]),
+
+    Y=float(start_row["latitude"])
+
+)
+
+end_node = ox.distance.nearest_nodes(
+
+    G,
+
+    X=float(end_row["longitude"]),
+
+    Y=float(end_row["latitude"])
+
+)
+
+# GENERATE ROUTE
+try:
+
+    route = nx.shortest_path(
+
+        G,
+
+        source=start_node,
+
+        target=end_node,
+
+        weight="weight"
+
+    )
+
+    st.success(
+        "Optimized low-congestion route generated"
+    )
+
+    # ROUTE MAP
+    fig, ax = ox.plot_graph_route(
+
+        G,
+
+        route,
+
+        route_linewidth=4,
+
+        node_size=0,
+
+        bgcolor="white",
+
+        show=False,
+
+        close=False
+
+    )
+
+    st.pyplot(fig)
+
+except:
+
+    st.error(
+        "Unable to generate route"
+    )
